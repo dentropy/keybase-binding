@@ -60,9 +60,10 @@ class ExportKeybase():
             self.get_keybase_username()
             self.cur.execute(f"INSERT INTO whoami_t (keybase_username) VALUES ('{self.whoami}')")
             self.con.commit()
+            return True
         else:
             self.whoami = self.cur.execute("SELECT keybase_username FROM whoami_t ").fetchone()[0]
-        return self.whoami
+            return False
 
 
     def get_teams(self):
@@ -180,6 +181,18 @@ class ExportKeybase():
 
     def save_all_team_channels(self):
         json.dump(self.get_all_team_channels(), open(f"{self.save_dir}/team_channels.json", 'w'))
+        res = self.cur.execute("SELECT COUNT(*) FROM team_channels_t").fetchone()[0]
+        if res != 0:
+            return False
+        self.get_all_team_channels()
+        formatted_team_member_list = []
+        for channel in self.team_channels:
+            for team_member in self.team_channels[channel]:
+               formatted_team_member_list.append((channel,team_member,))
+        self.cur.executemany("INSERT INTO team_channels_t(team_name, channel_name) VALUES(?, ?)", formatted_team_member_list)
+        self.con.commit()
+        return True
+
 
     def get_list_group_chats(self):
         if self.group_chats != None:
