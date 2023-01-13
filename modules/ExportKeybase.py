@@ -30,7 +30,7 @@ class ExportKeybase():
             self.teams = json.load(open(  paths_in_dir[files_in_dir.index("teams.json")]  )) 
         self.team_members = None
         if 'team_members.json' in files_in_dir:
-            self.teams = json.load(open(  paths_in_dir[files_in_dir.index("team_members.json")]  )) 
+            self.team_members = json.load(open(  paths_in_dir[files_in_dir.index("team_members.json")]  )) 
         self.team_channels = None
         if 'team_channels.json' in files_in_dir:
             self.team_channels = json.load(open(  paths_in_dir[files_in_dir.index("team_channels.json")]  )) 
@@ -84,7 +84,6 @@ class ExportKeybase():
         if self.team_members != None:
             return self.team_members
         else:
-            print("else")
             self.team_members = {}
             for team in self.get_teams():
                 print(f"Getting Members for Team {team}")
@@ -144,9 +143,8 @@ class ExportKeybase():
             "method": "list"
         }
         '''
-        print(json_string)
         response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
-        self.group_chats = user_data = json.loads(response.decode('utf-8'))
+        self.group_chats = json.loads(response.decode('utf-8'))["result"]["conversations"]
         return self.group_chats
 
 
@@ -200,6 +198,61 @@ class ExportKeybase():
         return messages
 
 
+    def save_all_messages_from_channel(self, chat_name, folder_sub_path):
+        dm_save_dir = f"{self.save_dir}/{folder_sub_path}"
+        Path(dm_save_dir).mkdir(parents=True, exist_ok=True)
+        another_page_exists = True 
+        page_count = 1
+        messages = []
+        json_string = '''
+        {
+            "method": "read", 
+            "params": {
+                "options": {
+                    "members_type": "team",
+                    "channel": {
+                        "name": "%s"
+                    }, 
+                    "pagination": {
+                        "num": 1000
+                    }
+                }
+            }
+        }
+        '''  % (chat_name)
+        response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
+        response_json =  json.loads(response.decode('utf-8'))
+        messages += response_json["result"]["messages"]
+        another_page_exists = "last" not in response_json["result"]["pagination"].keys()
+        while(another_page_exists):
+            next_page_arg = response_json["result"]["pagination"]["next"]
+            json_string = '''
+            {
+                "method": "read", 
+                "params": {
+                    "options": {
+                        "channel": {
+                            "name": "%s"
+                        }, 
+                        "pagination": {
+                            "num": %d,
+                            "next": "%s"
+                        }
+                    }
+                }
+            }
+            '''  % (chat_name, 1000, next_page_arg)
+            response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
+            response_json =  json.loads(response.decode('utf-8'))
+            messages += response_json["result"]["messages"]
+            another_page_exists = "last" not in response_json["result"]["pagination"].keys()
+            if len(messages) >= 10000:
+                json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+                messages = []
+                page_count += 1
+        json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+        return True
+
     def save_all_messages_from_team_channel(self, team_name, topic_name, folder_sub_path):
         dm_save_dir = f"{self.save_dir}/{folder_sub_path}"
         Path(dm_save_dir).mkdir(parents=True, exist_ok=True)
@@ -226,7 +279,7 @@ class ExportKeybase():
         '''  % (team_name, topic_name)
         response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
         response_json =  json.loads(response.decode('utf-8'))
-        print(response_json)
+        messages += response_json["result"]["messages"]
         another_page_exists = "last" not in response_json["result"]["pagination"].keys()
         while(another_page_exists):
             next_page_arg = response_json["result"]["pagination"]["next"]
@@ -253,10 +306,10 @@ class ExportKeybase():
             messages += response_json["result"]["messages"]
             another_page_exists = "last" not in response_json["result"]["pagination"].keys()
             if len(messages) >= 10000:
-                json.dump(self.get_list_group_chats(), open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+                json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
                 messages = []
                 page_count += 1
-        json.dump(self.get_list_group_chats(), open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+        json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
         return True
 
 
@@ -264,11 +317,12 @@ class ExportKeybase():
         if self.group_chats == None:
             return self.save_list_group_chats()
         channel_list = []
-        for channel in self.group_chats["result"]["conversations"]:
+        for channel in self.group_chats:
             if channel["channel"]["members_type"] == "impteamnative":
                 channel_list.append(channel["channel"]["name"])
         for channel in channel_list:
-            self.save_all_messages_from_channel(channel, "DMs")
+            print(f"Getting messages for channel {channel}")
+            self.save_all_messages_from_channel(channel, f"DMs/{channel}")
         return True
 
 
@@ -279,27 +333,26 @@ class ExportKeybase():
             return "Error not a valid team"
         channels = self.get_team_channels(keybase_team)
         for channel in channels:
-            self.save_all_messages_from_team_channel(keybase_team, channel, f"TeamTest/{keybase_team}/{channel}")
+            self.save_all_messages_from_team_channel(keybase_team, channel, f"SpecificTeamOut/{keybase_team}/{channel}")
         return True
         # save_all_messages_from_team_channel(self, team_name, topic_name, folder_sub_path):
 
-    # def save_all_team_channels(self):
-    #     if self.group_chats == None:
-    #         self.save_list_group_chats()
-    #     channel_list = []
-    #     for channel in self.group_chats["result"]["conversations"]:
-    #         if channel["channel"]["members_type"] == "team":
-    #             channel_list.append({
-    #                 "team_name"  : channel["channel"]["name"],
-    #                 "topic_name" : channel["channel"]["topic_name"]
-    #                 })
-    #     for channel in channel_list:
-    #         tmp_team_name  = channel["team_name"]
-    #         tmp_topic_name = channel["topic_name"]
-    #         self.save_all_messages_from_team_channel(channel["team_name"], channel["topic_name"] , f"Teams/{tmp_team_name}/{tmp_topic_name}")
-    #     return True
-
-
+    def save_all_team_channel_messages(self):
+        if self.group_chats == None:
+            self.save_list_group_chats()
+        channel_list = []
+        for channel in self.group_chats:
+            if channel["channel"]["members_type"] == "team":
+                channel_list.append({
+                    "team_name"  : channel["channel"]["name"],
+                    "topic_name" : channel["channel"]["topic_name"]
+                    })
+        for channel in channel_list:
+            tmp_team_name  = channel["team_name"]
+            tmp_topic_name = channel["topic_name"]
+            print(f"Getting messages from team {tmp_team_name} channel {tmp_topic_name}")
+            self.save_all_messages_from_team_channel(channel["team_name"], channel["topic_name"] , f"Teams/{tmp_team_name}/{tmp_topic_name}")
+        return True
 
 
     # def get_user_metadata(self, username):
