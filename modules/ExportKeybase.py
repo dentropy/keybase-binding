@@ -7,6 +7,7 @@ import os
 # from urlextract import URLExtract
 import datetime
 from pathlib import Path
+import sqlite3
 # from sqlalchemy import distinct, desc
 
 class ExportKeybase():
@@ -37,7 +38,14 @@ class ExportKeybase():
         self.group_chats = None
         if 'group_chats.json' in files_in_dir:
             self.group_chats = json.load(open(  paths_in_dir[files_in_dir.index("group_chats.json")]  )) 
-
+        self.con = sqlite3.connect(f"{self.save_dir}.keybase_export.db")
+        self.cur = con.cursor()
+        self.cur.execute("CREATE TABLE whoami_t(keybase_username)")
+        self.cur.execute("CREATE TABLE teams(team_name)")
+        self.cur.execute("CREATE TABLE team_members_t(team_name, member_name)")
+        self.cur.execute("CREATE TABLE team_channels_t(team_name, channel_name)")
+        self.cur.execute("CREATE TABLE group_chats_t(group_name, message_json)")
+        self.cur.execute("CREATE TABLE team_chats_t(team_name, topic_name, message_json)")
 
     def get_teams(self):
         """Return string list of all current-user Keybase teams."""
