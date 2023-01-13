@@ -26,6 +26,7 @@ class ExportKeybase():
         files_in_dir = []
         for path in paths_in_dir:
             files_in_dir.append( path.split("/")[-1] )
+        self.whoami = None
         self.teams = None
         if 'teams.json' in files_in_dir:
             self.teams = json.load(open(  paths_in_dir[files_in_dir.index("teams.json")]  )) 
@@ -38,14 +39,32 @@ class ExportKeybase():
         self.group_chats = None
         if 'group_chats.json' in files_in_dir:
             self.group_chats = json.load(open(  paths_in_dir[files_in_dir.index("group_chats.json")]  )) 
-        self.con = sqlite3.connect(f"{self.save_dir}.keybase_export.db")
-        self.cur = con.cursor()
-        self.cur.execute("CREATE TABLE whoami_t(keybase_username)")
-        self.cur.execute("CREATE TABLE teams(team_name)")
-        self.cur.execute("CREATE TABLE team_members_t(team_name, member_name)")
-        self.cur.execute("CREATE TABLE team_channels_t(team_name, channel_name)")
-        self.cur.execute("CREATE TABLE group_chats_t(group_name, message_json)")
-        self.cur.execute("CREATE TABLE team_chats_t(team_name, topic_name, message_json)")
+        self.con = sqlite3.connect(f"{self.save_dir}/keybase_export.sqlite")
+        self.cur = self.con.cursor()
+        self.cur.execute("CREATE TABLE IF NOT EXISTS whoami_t(keybase_username)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS teams(team_name)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS team_members_t(team_name, member_name)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS team_channels_t(team_name, channel_name)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS group_chats_t(group_name, message_json)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS team_chats_t(team_name, topic_name, message_json)")
+
+
+    def get_keybase_username(self):
+        if self.whoami == None:
+            self.whoami = str(subprocess.check_output(["keybase", "whoami"]))[2:-3]
+        return self.whoami
+
+    def save_keybase_username(self):
+        res = self.cur.execute("SELECT COUNT(*) FROM whoami_t").fetchone()[0]
+        if res == 0:
+            self.get_keybase_username()
+            self.cur.execute(f"INSERT INTO whoami_t (keybase_username) VALUES ('{self.whoami}')")
+            self.con.commit()
+            print("Damit")
+        else:
+            print("Else")
+            self.whoami = self.cur.execute("SELECT keybase_username FROM whoami_t ").fetchone()[0]
+        return self.whoami
 
     def get_teams(self):
         """Return string list of all current-user Keybase teams."""

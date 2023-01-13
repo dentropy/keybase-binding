@@ -4,6 +4,8 @@ ex_key = ExportKeybase()
 
 # Uncomment everything below to export your keybase data
 
+ex_key.save_keybase_username()
+# ex_Key.save_keybase_username()
 # ex_key.save_teams()
 # ex_key.save_members_of_all_teams()
 # ex_key.save_all_team_channels()
