@@ -270,6 +270,9 @@ class ExportKeybase():
 
 
     def save_all_messages_from_channel(self, chat_name, folder_sub_path):
+        res = self.cur.execute(f"SELECT COUNT(*) FROM group_messages_t WHERE group_name='{chat_name}'").fetchone()[0]
+        if res != 0:
+            return True
         dm_save_dir = f"{self.save_dir}/{folder_sub_path}"
         Path(dm_save_dir).mkdir(parents=True, exist_ok=True)
         another_page_exists = True 
@@ -319,12 +322,25 @@ class ExportKeybase():
             another_page_exists = "last" not in response_json["result"]["pagination"].keys()
             if len(messages) >= 10000:
                 json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+                sql_insert_list = []
+                for message in messages:
+                    sql_insert_list.append((chat_name,json.dumps(message),))
+                self.cur.executemany("INSERT INTO group_messages_t(group_name, message_json) VALUES(?, ?)", sql_insert_list)
+                self.con.commit()
                 messages = []
                 page_count += 1
         json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+        sql_insert_list = []
+        for message in messages:
+               sql_insert_list.append((chat_name,json.dumps(message),))
+        self.cur.executemany("INSERT INTO group_messages_t(group_name, message_json) VALUES(?, ?)", sql_insert_list)
+        self.con.commit()
         return True
 
     def save_all_messages_from_team_channel(self, team_name, topic_name, folder_sub_path):
+        res = self.cur.execute(f"SELECT COUNT(*) FROM team_messages_t WHERE team_name='{team_name}'").fetchone()[0]
+        if res != 0:
+            return True
         dm_save_dir = f"{self.save_dir}/{folder_sub_path}"
         Path(dm_save_dir).mkdir(parents=True, exist_ok=True)
         another_page_exists = True 
@@ -378,9 +394,19 @@ class ExportKeybase():
             another_page_exists = "last" not in response_json["result"]["pagination"].keys()
             if len(messages) >= 10000:
                 json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+                sql_insert_list = []
+                for message in messages:
+                    sql_insert_list.append((team_name, topic_name, json.dumps(message),))
+                self.cur.executemany("INSERT INTO team_messages_t(team_name, topic_name, message_json) VALUES(?, ?, ?)", sql_insert_list)
+                self.con.commit()
                 messages = []
                 page_count += 1
         json.dump(messages, open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+        sql_insert_list = []
+        for message in messages:
+               sql_insert_list.append((team_name, topic_name, json.dumps(message),))
+        self.cur.executemany("INSERT INTO team_messages_t(team_name, topic_name, message_json) VALUES(?, ?, ?)", sql_insert_list)
+        self.con.commit()
         return True
 
 
