@@ -80,12 +80,15 @@ class ExportKeybase():
 
     def save_teams(self):
         json.dump(self.get_teams(), open(f"{self.save_dir}/teams.json", 'w'))
+        res = self.cur.execute("SELECT COUNT(*) FROM teams_t").fetchone()[0]
+        if res != 0:
+            return False
         formatted_teams = []
         for team in self.get_teams():
             formatted_teams.append((team,))
-        print(formatted_teams)
         self.cur.executemany("INSERT INTO teams_t(team_name) VALUES(?)", formatted_teams)
         self.con.commit()
+        return True
 
 
     def get_members_of_team(self, team_name):
@@ -125,6 +128,17 @@ class ExportKeybase():
 
     def save_members_of_all_teams(self):
         json.dump(self.get_members_of_all_teams(), open(f"{self.save_dir}/team_members.json", 'w'))
+        res = self.cur.execute("SELECT COUNT(*) FROM team_members_t").fetchone()[0]
+        if res != 0:
+            return False
+        self.get_members_of_all_teams()
+        formatted_team_member_list = []
+        for team in self.team_members:
+            for team_member in self.team_members[team]:
+               formatted_team_member_list.append((team,team_member,))
+        self.cur.executemany("INSERT INTO team_members_t(team_name, member_name) VALUES(?, ?)", formatted_team_member_list)
+        self.con.commit()
+        return True
 
 
     def get_team_channels(self,keybase_team_name):
