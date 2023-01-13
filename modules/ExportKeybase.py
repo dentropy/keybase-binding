@@ -45,8 +45,9 @@ class ExportKeybase():
         self.cur.execute("CREATE TABLE IF NOT EXISTS teams_t(team_name)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS team_members_t(team_name, member_name)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS team_channels_t(team_name, channel_name)")
-        self.cur.execute("CREATE TABLE IF NOT EXISTS group_chats_t(group_name, message_json)")
-        self.cur.execute("CREATE TABLE IF NOT EXISTS team_chats_t(team_name, topic_name, message_json)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS group_channels_t(group_name)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS group_messages_t(group_name, message_json)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS team_messages_t(team_name, topic_name, message_json)")
 
 
     def get_keybase_username(self):
@@ -208,7 +209,18 @@ class ExportKeybase():
 
 
     def save_list_group_chats(self):
-        json.dump(self.get_list_group_chats(), open(f"{self.save_dir}/group_chats.json", 'w'))
+        self.get_list_group_chats()
+        json.dump(self.group_chats, open(f"{self.save_dir}/group_chats.json", 'w'))
+        res = self.cur.execute("SELECT COUNT(*) FROM group_channels_t").fetchone()[0]
+        if res != 0:
+            return False
+        sql_insert_list = []
+        for channel in self.group_chats:
+            sql_insert_list.append((json.dumps(channel),))
+        self.cur.executemany("INSERT INTO group_channels_t(group_name) VALUES(?)", sql_insert_list)
+        self.con.commit()
+        return True
+
 
 
     def get_all_chat_messages_from_group(self, chat_name):
