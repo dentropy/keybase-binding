@@ -1,26 +1,56 @@
 from string import Template
 import subprocess
 import json
-from database import DB, Messages, Users
-from urlextract import URLExtract
+from glob import glob
+import os
+# from database import DB, Messages, Users
+# from urlextract import URLExtract
 import datetime
-from sqlalchemy import distinct, desc
+from pathlib import Path
+# from sqlalchemy import distinct, desc
 
 class ExportKeybase():
-    def __init__(self):
+    def __init__(self, save_dir="./out/"):
         """Initialize the ExportKeybase object."""
-        self.extractor = URLExtract()
+        # self.extractor = URLExtract()
+        # Make folders if they do not exist
+        self.save_dir = save_dir
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        Path(f"{self.save_dir}/DMs").mkdir(parents=True, exist_ok=True)
+        Path(f"{self.save_dir}/Teams").mkdir(parents=True, exist_ok=True)
+        Path(f"{self.save_dir}/Attachments").mkdir(parents=True, exist_ok=True)
+        Path(f"{self.save_dir}/UserMetadata").mkdir(parents=True, exist_ok=True)
+        Path(f"{self.save_dir}/GitRepos").mkdir(parents=True, exist_ok=True)
+        paths_in_dir = glob(self.save_dir + "/*")
+        files_in_dir = []
+        for path in paths_in_dir:
+            files_in_dir.append( path.split("/")[-1] )
+        self.teams = None
+        if 'teams.json' in files_in_dir:
+            self.teams = json.load(open(  paths_in_dir[files_in_dir.index("teams.json")]  )) 
+        self.team_members = None
+        if 'team_members.json' in files_in_dir:
+            self.teams = json.load(open(  paths_in_dir[files_in_dir.index("team_members.json")]  )) 
+        self.group_chats = None
+        if 'group_chats.json' in files_in_dir:
+            self.group_chats = json.load(open(  paths_in_dir[files_in_dir.index("group_chats.json")]  )) 
     
     def get_teams(self):
         """Return string list of all current-user Keybase teams."""
-        keybase_teams = subprocess.check_output(["keybase", "team", "list-memberships"])
-        team_string = str(keybase_teams).split("\\n")
-        teams = []
-        for i in team_string[1:-1]:
-            teams.append(i.split()[0])
-        return teams
+        if self.teams == None:
+            keybase_teams = subprocess.check_output(["keybase", "team", "list-memberships"])
+            team_string = str(keybase_teams).split("\\n")
+            self.teams = []
+            for i in team_string[1:-1]:
+                self.teams.append(i.split()[0])
+            return self.teams
+        else:
+            return self.teams
 
-    def get_team_memberships(self, team_name):
+    def save_teams(self):
+        json.dump(self.get_teams(), open(f"{self.save_dir}/teams.json", 'w'))
+
+    def get_members_of_team(self, team_name):
         """Return string list of all users for a specific team."""
         json_string = '''
         {
@@ -41,34 +71,177 @@ class ExportKeybase():
                     usernames.append(user_data["result"]["members"][key][mah_val]["username"])
         return usernames
     
-    def get_user_metadata(self, username):
-        """Get string of URLs for accounts that user has linked with Keybase account."""
-        user_metadata = {"verification":[]}
-        response = subprocess.check_output(["keybase", "id", username],stderr=subprocess.STDOUT, encoding="utf-8")
-        response_string = str(response)[1:-1]#response.decode("utf-8")
-        for line in response_string.split("\n"):
-            if "admin of" in line:
-                user_metadata["verification"].append(line.split()[6][5:-6])
-        for url in self.extractor.find_urls(response_string):
-            user_metadata["verification"].append(url)
+    def get_members_of_all_teams(self):
+        if self.teams == None:
+            self.get_teams()
+        if self.team_members != None:
+            return self.team_members
+        else:
+            print("else")
+            self.team_members = {}
+            for team in self.get_teams():
+                print(f"Getting Team {team}")
+                self.team_members[team] = self.get_members_of_team(team)
+            return self.team_members
+                
+
+    def save_members_of_all_teams(self):
+        json.dump(self.get_members_of_all_teams(), open(f"{self.save_dir}/team_members.json", 'w'))
+
+
+    def get_list_group_chats(self):
+        if self.group_chats != None:
+            return self.group_chats
         json_string = '''
         {
-            "method": "list-user-memberships", 
+            "method": "list"
+        }
+        '''
+        print(json_string)
+        response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
+        self.group_chats = user_data = json.loads(response.decode('utf-8'))
+        return self.group_chats
+
+    def save_list_group_chats(self):
+        json.dump(self.get_list_group_chats(), open(f"{self.save_dir}/group_chats.json", 'w'))
+
+    def get_all_chat_messages_from_group(self, chat_name):
+        another_page_exists = True 
+        messages = []
+        json_string = '''
+        {
+            "method": "read", 
             "params": {
-                "options": {"username": "%s"}
+                "options": {
+                    "channel": {
+                        "name": "%s"
+                    }, 
+                    "pagination": {
+                        "num": 1000
+                    }
+                }
             }
         }
-        ''' % (username)
-        response = json.loads(subprocess.check_output(["keybase", "team", "api", "-m", json_string]).decode('utf-8'))
-        team_list = []
-        for team in response["result"]["teams"]:
-            team_list.append(team["fq_name"])
-        user_metadata["teams"] = team_list
-        user_metadata["followers"] = subprocess.check_output(
-            ["keybase", "list-followers", username],stderr=subprocess.STDOUT, encoding="utf-8").split("\n")
-        user_metadata["following"] = subprocess.check_output(
-            ["keybase", "list-following", username],stderr=subprocess.STDOUT, encoding="utf-8").split("\n")
-        return user_metadata
+        '''  % (chat_name, chat_page, next_page_arg)
+        response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
+        response_json =  json.loads(response.decode('utf-8'))
+        another_page_exists = "last" not in response_json["result"]["pagination"].keys()
+        while(another_page_exists):
+            json_string = '''
+            {
+                "method": "read", 
+                "params": {
+                    "options": {
+                        "channel": {
+                            "name": "%s"
+                        }, 
+                        "pagination": {
+                            "num": %d,
+                            "next": "%s"
+                        }
+                    }
+                }
+            }
+            '''  % (chat_name, chat_page, next_page_arg)
+            response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
+            response_json =  json.loads(response.decode('utf-8'))
+            messages += response_json["result"]["messages"]
+            next_page_arg = response_json["result"]["pagination"]["next"]
+            another_page_exists = "last" not in response_json["result"]["pagination"].keys()
+        return messages
+
+    def save_all_chat_messages_from_channel(self, chat_name):
+        dm_save_dir = f"{self.save_dir}/DMs/{chat_name}"
+        Path(dm_save_dir).mkdir(parents=True, exist_ok=True)
+        another_page_exists = True 
+        page_count = 1
+        messages = []
+        json_string = '''
+        {
+            "method": "read", 
+            "params": {
+                "options": {
+                    "channel": {
+                        "name": "%s"
+                    }, 
+                    "pagination": {
+                        "num": 1000
+                    }
+                }
+            }
+        }
+        '''  % (chat_name)
+        response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
+        response_json =  json.loads(response.decode('utf-8'))
+        another_page_exists = "last" not in response_json["result"]["pagination"].keys()
+        while(another_page_exists):
+            next_page_arg = response_json["result"]["pagination"]["next"]
+            json_string = '''
+            {
+                "method": "read", 
+                "params": {
+                    "options": {
+                        "channel": {
+                            "name": "%s"
+                        }, 
+                        "pagination": {
+                            "num": %d,
+                            "next": "%s"
+                        }
+                    }
+                }
+            }
+            '''  % (chat_name, 1000, next_page_arg)
+            response = subprocess.check_output(["keybase", "chat", "api", "-m", json_string])
+            response_json =  json.loads(response.decode('utf-8'))
+            messages += response_json["result"]["messages"]
+            another_page_exists = "last" not in response_json["result"]["pagination"].keys()
+            if len(messages) >= 10000:
+                json.dump(self.get_list_group_chats(), open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+                messages = []
+                page_count += 1
+        json.dump(self.get_list_group_chats(), open(f"{dm_save_dir}/{str(page_count).zfill(3)}.json", 'w'))
+        return True
+
+    def save_all_group_chat_channels(self):
+        if self.group_chats == None:
+            return self.save_list_group_chats()
+        channel_list = []
+        for channel in self.group_chats["result"]["conversations"]:
+            if channel["channel"]["members_type"] == "impteamnative":
+                channel_list.append(channel["channel"]["name"])
+        for channel in channel_list:
+            self.save_all_chat_messages_from_channel(channel)
+        return True
+
+    # def get_user_metadata(self, username):
+    #     """Get string of URLs for accounts that user has linked with Keybase account."""
+    #     user_metadata = {"verification":[]}
+    #     response = subprocess.check_output(["keybase", "id", username],stderr=subprocess.STDOUT, encoding="utf-8")
+    #     response_string = str(response)[1:-1]#response.decode("utf-8")
+    #     for line in response_string.split("\n"):
+    #         if "admin of" in line:
+    #             user_metadata["verification"].append(line.split()[6][5:-6])
+    #     for url in self.extractor.find_urls(response_string):
+    #         user_metadata["verification"].append(url)
+    #     json_string = '''
+    #     {
+    #         "method": "list-user-memberships", 
+    #         "params": {
+    #             "options": {"username": "%s"}
+    #         }
+    #     }
+    #     ''' % (username)
+    #     response = json.loads(subprocess.check_output(["keybase", "team", "api", "-m", json_string]).decode('utf-8'))
+    #     team_list = []
+    #     for team in response["result"]["teams"]:
+    #         team_list.append(team["fq_name"])
+    #     user_metadata["teams"] = team_list
+    #     user_metadata["followers"] = subprocess.check_output(
+    #         ["keybase", "list-followers", username],stderr=subprocess.STDOUT, encoding="utf-8").split("\n")
+    #     user_metadata["following"] = subprocess.check_output(
+    #         ["keybase", "list-following", username],stderr=subprocess.STDOUT, encoding="utf-8").split("\n")
+    #     return user_metadata
 
     
     def get_team_channels(self,keybase_team_name):
