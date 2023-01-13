@@ -42,7 +42,7 @@ class ExportKeybase():
         self.con = sqlite3.connect(f"{self.save_dir}/keybase_export.sqlite")
         self.cur = self.con.cursor()
         self.cur.execute("CREATE TABLE IF NOT EXISTS whoami_t(keybase_username)")
-        self.cur.execute("CREATE TABLE IF NOT EXISTS teams(team_name)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS teams_t(team_name)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS team_members_t(team_name, member_name)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS team_channels_t(team_name, channel_name)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS group_chats_t(group_name, message_json)")
@@ -60,11 +60,10 @@ class ExportKeybase():
             self.get_keybase_username()
             self.cur.execute(f"INSERT INTO whoami_t (keybase_username) VALUES ('{self.whoami}')")
             self.con.commit()
-            print("Damit")
         else:
-            print("Else")
             self.whoami = self.cur.execute("SELECT keybase_username FROM whoami_t ").fetchone()[0]
         return self.whoami
+
 
     def get_teams(self):
         """Return string list of all current-user Keybase teams."""
@@ -81,6 +80,12 @@ class ExportKeybase():
 
     def save_teams(self):
         json.dump(self.get_teams(), open(f"{self.save_dir}/teams.json", 'w'))
+        formatted_teams = []
+        for team in self.get_teams():
+            formatted_teams.append((team,))
+        print(formatted_teams)
+        self.cur.executemany("INSERT INTO teams_t(team_name) VALUES(?)", formatted_teams)
+        self.con.commit()
 
 
     def get_members_of_team(self, team_name):
