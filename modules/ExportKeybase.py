@@ -50,6 +50,8 @@ class ExportKeybase():
         self.cur.execute("CREATE TABLE IF NOT EXISTS group_messages_t(group_name, message_json)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS team_messages_t(team_name, topic_name, message_json)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS git_repos_t(git_repo_name, git_repo_path)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS followers_t(keybase_usernames)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS following_t(keybase_usernames)")
 
 
     def get_keybase_username(self):
@@ -434,18 +436,10 @@ class ExportKeybase():
         for channel in channels:
             self.save_all_messages_from_team_channel(keybase_team, channel, f"SpecificTeamOut/{keybase_team}/{channel}")
         return True
-        # save_all_messages_from_team_channel(self, team_name, topic_name, folder_sub_path):
 
     def save_all_team_channel_messages(self):
-        # if self.team_channels == None:
-        #     self.save_list_group_chats()
         channel_list = []
         for team_name in self.team_channels:
-            # if channel["channel"]["members_type"] == "team":
-            #     channel_list.append({
-            #         "team_name"  : channel["channel"]["name"],
-            #         "topic_name" : channel["channel"]["topic_name"]
-            #         })
             for topic_name in self.team_channels[team_name]:
                 channel_list.append({
                     "team_name" : team_name,
@@ -551,41 +545,33 @@ class ExportKeybase():
             subprocess.run(f"git clone {repo[1]} {save_path}", shell=True)
         return True
 
-    def zip_all_git_repos(self):
-        pass
+    def get_keybase_followers(self):
+        res = self.cur.execute("SELECT COUNT(*) FROM followers_t").fetchone()[0]
+        if res != 0:
+            return True
+        response = subprocess.check_output(["keybase", "list-followers"])
+        formatted_team_member_list = []
+        for item in str(response)[2:-5].split("\\n"):
+            formatted_team_member_list.append((item,))
+        self.cur.executemany("INSERT INTO followers_t(keybase_usernames) VALUES(?)", formatted_team_member_list)
+        self.con.commit()
+        return True
 
-    def delete_all_raw_git_repos(self):
-        pass
+    def get_keybase_following(self):
+        res = self.cur.execute("SELECT COUNT(*) FROM following_t").fetchone()[0]
+        if res != 0:
+            return True
+        response = subprocess.check_output(["keybase", "list-following"])
+        formatted_team_member_list = []
+        for item in str(response)[2:-5].split("\\n"):
+            formatted_team_member_list.append((item,))
+        self.cur.executemany("INSERT INTO following_t(keybase_usernames) VALUES(?)", formatted_team_member_list)
+        self.con.commit()
+        return True
 
-    # def get_user_metadata(self, username):
-    #     """Get string of URLs for accounts that user has linked with Keybase account."""
-    #     user_metadata = {"verification":[]}
-    #     response = subprocess.check_output(["keybase", "id", username],stderr=subprocess.STDOUT, encoding="utf-8")
-    #     response_string = str(response)[1:-1]#response.decode("utf-8")
-    #     for line in response_string.split("\n"):
-    #         if "admin of" in line:
-    #             user_metadata["verification"].append(line.split()[6][5:-6])
-    #     for url in self.extractor.find_urls(response_string):
-    #         user_metadata["verification"].append(url)
-    #     json_string = '''
-    #     {
-    #         "method": "list-user-memberships", 
-    #         "params": {
-    #             "options": {"username": "%s"}
-    #         }
-    #     }
-    #     ''' % (username)
-    #     response = json.loads(subprocess.check_output(["keybase", "team", "api", "-m", json_string]).decode('utf-8'))
-    #     team_list = []
-    #     for team in response["result"]["teams"]:
-    #         team_list.append(team["fq_name"])
-    #     user_metadata["teams"] = team_list
-    #     user_metadata["followers"] = subprocess.check_output(
-    #         ["keybase", "list-followers", username],stderr=subprocess.STDOUT, encoding="utf-8").split("\n")
-    #     user_metadata["following"] = subprocess.check_output(
-    #         ["keybase", "list-following", username],stderr=subprocess.STDOUT, encoding="utf-8").split("\n")
-    #     return user_metadata
 
+
+##################################################################################3
 
     def get_team_chat_channel(self, keybase_team_name, keybase_topic_name):
         """Returns json object of all messages within a Keybase team topic"""
