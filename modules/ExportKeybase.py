@@ -217,7 +217,7 @@ class ExportKeybase():
         sql_insert_list = []
         for channel in self.group_chats:
             sql_insert_list.append((json.dumps(channel),))
-        self.cur.executemany("INSERT INTO group_channels_t(group_name) VALUES(?)", sql_insert_list)
+        self.cur.executemany("INSERT INTO group_channels_t(group_name) VALUES(json(?))", sql_insert_list)
         self.con.commit()
         return True
 
@@ -325,7 +325,7 @@ class ExportKeybase():
                 sql_insert_list = []
                 for message in messages:
                     sql_insert_list.append((chat_name,json.dumps(message),))
-                self.cur.executemany("INSERT INTO group_messages_t(group_name, message_json) VALUES(?, ?)", sql_insert_list)
+                self.cur.executemany("INSERT INTO group_messages_t(group_name, message_json) VALUES(?, json(?))", sql_insert_list)
                 self.con.commit()
                 messages = []
                 page_count += 1
@@ -333,7 +333,7 @@ class ExportKeybase():
         sql_insert_list = []
         for message in messages:
                sql_insert_list.append((chat_name,json.dumps(message),))
-        self.cur.executemany("INSERT INTO group_messages_t(group_name, message_json) VALUES(?, ?)", sql_insert_list)
+        self.cur.executemany("INSERT INTO group_messages_t(group_name, message_json) VALUES(?, json(?))", sql_insert_list)
         self.con.commit()
         return True
 
@@ -397,7 +397,7 @@ class ExportKeybase():
                 sql_insert_list = []
                 for message in messages:
                     sql_insert_list.append((team_name, topic_name, json.dumps(message),))
-                self.cur.executemany("INSERT INTO team_messages_t(team_name, topic_name, message_json) VALUES(?, ?, ?)", sql_insert_list)
+                self.cur.executemany("INSERT INTO team_messages_t(team_name, topic_name, message_json) VALUES(?, ?, json(?))", sql_insert_list)
                 self.con.commit()
                 messages = []
                 page_count += 1
@@ -405,7 +405,7 @@ class ExportKeybase():
         sql_insert_list = []
         for message in messages:
                sql_insert_list.append((team_name, topic_name, json.dumps(message),))
-        self.cur.executemany("INSERT INTO team_messages_t(team_name, topic_name, message_json) VALUES(?, ?, ?)", sql_insert_list)
+        self.cur.executemany("INSERT INTO team_messages_t(team_name, topic_name, message_json) VALUES(?, ?, json(?))", sql_insert_list)
         self.con.commit()
         return True
 
@@ -449,6 +449,51 @@ class ExportKeybase():
             tmp_topic_name = channel["topic_name"]
             print(f"Getting messages from team {tmp_team_name} channel {tmp_topic_name}")
             self.save_all_messages_from_team_channel(channel["team_name"], channel["topic_name"] , f"Teams/{tmp_team_name}/{tmp_topic_name}")
+        return True
+
+    def get_attachments_from_all_group_chats(self):
+        sql_query = '''
+            select DISTINCT(json_extract(message_json, '$.msg.channel.name')) from group_messages_t
+        '''
+        res = self.cur.execute(sql_query).fetchmany(size=10000)
+        formatted_result = []
+        for chat in res:
+            formatted_result.append(chat[0])
+        return formatted_result
+        for chat in formatted_result:
+            self.get_attachments_from_specific_group_chat(chat)
+        return True
+
+    def get_attachments_from_specific_group_chat(self, group_chat_name):
+        sql_query = f'''
+            SELECT  
+                json_extract(message_json, '$.msg.id'), 
+                json_extract(message_json, '$.msg.sender.uid'), 
+                json_extract(message_json, '$.msg.sent_at_ms'), 
+                json_extract(message_json, '$.msg.content.attachment.object.filename') 
+            FROM group_messages_t
+            WHERE 
+                json_extract(message_json, '$.msg.content.type') IN ("attachment", "attachmentuploaded")
+                AND json_extract(message_json, '$.msg.channel.name') = "{group_chat_name}";
+        '''
+        print(sql_query)
+        res = self.cur.execute(sql_query).fetchmany(size=10000)
+        # keybase chat download [command options] <conversation> <attachment id> [-o filename]
+        # Attachment_id is the nonce
+        Path(f"{self.save_dir}Attachments").mkdir(parents=True, exist_ok=True)
+        for file_row in res:
+            list_me = [
+                "keybase", 
+                "chat", 
+                "download", 
+                f"'{group_chat_name}'", 
+                f"{file_row[0]}", 
+                "-o",
+                f"{self.save_dir}Attachments/{file_row[1]}-{file_row[2]}-{file_row[3].replace(' ', '_')}"
+                ]
+            print(" ".join(list_me))
+            response = subprocess.run(" ".join(list_me), shell=True)
+            print(response)
         return True
 
 

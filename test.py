@@ -1,15 +1,13 @@
 from modules.ExportKeybase import ExportKeybase
+from pprint import pprint
 
 ex_key = ExportKeybase()
 
-# Uncomment everything below to export your keybase data
+# print("get_attachments_from_all_group_chats")
+# print(f"{ex_key.get_attachments_from_all_group_chats()}")
 
-print(f"save_keybase_username:         {ex_key.save_keybase_username()}")
-print(f"save_teams:                    {ex_key.save_teams()}")
-print(f"save_members_of_all_teams:     {ex_key.save_members_of_all_teams()}")
-print(f"save_all_team_channels:        {ex_key.save_all_team_channels()}")
-print(f"save_list_group_chats:         {ex_key.save_list_group_chats()}")
-print(f"save_all_group_chat_channels:  {ex_key.save_all_group_chat_channels()}")
-print(f"save_all_team_channel_messages:{ex_key.save_all_team_channel_messages()}")
-# ex_key.save_specific_group_chat_channel()
-# ex_key.save_specific_team_chat("dentropydaemon")
+
+group_chat_test = 'dentropy,eatergiant'
+result = ex_key.get_attachments_from_specific_group_chat(group_chat_test)
+pprint(result)
+# ex_key.get_attachments_from_group_chats()
