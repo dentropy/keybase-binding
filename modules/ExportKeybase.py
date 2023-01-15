@@ -49,6 +49,7 @@ class ExportKeybase():
         self.cur.execute("CREATE TABLE IF NOT EXISTS group_channels_t(group_name)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS group_messages_t(group_name, message_json)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS team_messages_t(team_name, topic_name, message_json)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS git_repos_t(git_repo_name, git_repo_path)")
 
 
     def get_keybase_username(self):
@@ -524,7 +525,37 @@ class ExportKeybase():
         tmp_groups = self.cur.execute(sql_query).fetchmany(size=10000)
 
 
+    def list_all_git_repos(self):
+        res = self.cur.execute("SELECT COUNT(*) FROM git_repos_t").fetchone()[0]
+        if res != 0:
+            return True
+        response = subprocess.check_output(["keybase", "git", "list"],stderr=subprocess.STDOUT, encoding="utf-8")
+        all_repos = response.split("team repos:")[0].split("\n")[1:] + response.split("team repos:")[1].split("\n")
+        for repo_index in range(len(all_repos)):
+            all_repos[repo_index] = list(filter(("").__ne__, all_repos[repo_index].split(" ")))
+        all_repos = list(filter(([]).__ne__, all_repos))
+        self.cur.executemany("INSERT INTO git_repos_t(git_repo_name, git_repo_path) VALUES(?, ?)", all_repos)
+        self.con.commit()
+        return True
 
+    def clone_all_git_repos(self):
+        sql_query = f'''
+            SELECT  
+                git_repo_name, git_repo_path
+            FROM git_repos_t
+        '''
+        git_repos = self.cur.execute(sql_query).fetchmany(size=10000)
+        for repo in git_repos:
+            save_path = f"{self.save_dir}{repo[0].replace('/', '-')}"
+            Path(save_path).mkdir(parents=True, exist_ok=True)
+            subprocess.run(f"git clone {repo[1]} {save_path}", shell=True)
+        return True
+
+    def zip_all_git_repos(self):
+        pass
+
+    def delete_all_raw_git_repos(self):
+        pass
 
     # def get_user_metadata(self, username):
     #     """Get string of URLs for accounts that user has linked with Keybase account."""
