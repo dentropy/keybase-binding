@@ -504,11 +504,14 @@ class ExportKeybase():
     def get_attachments_from_all_group_chats(self):
         sql_query = f'''
             SELECT  
-                json_extract(message_json, '$.msg.channel.name'),
-                DISTINCT (  json_extract(message_json, '$.msg.channel.topic_name') )
-            FROM team_messages_t
+                DISTINCT
+                    group_name
+            FROM group_messages_t
         '''
-        res = self.cur.execute(sql_query).fetchmany(size=10000)
+        tmp_groups = self.cur.execute(sql_query).fetchmany(size=10000)
+        for tmp_group in tmp_groups:
+            self.get_attachments_from_specific_group_chat(tmp_group[0])
+        return True
 
 
     def get_attachments_from_specific_team_chat(self, team_name, topic_name):

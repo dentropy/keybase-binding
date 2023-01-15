@@ -12,5 +12,5 @@ ex_key = ExportKeybase()
 # pprint(result)
 
 
-result = ex_key.get_attachments_from_all_team_chats()
+result = ex_key.get_attachments_from_all_group_chats()
 pprint(result)
