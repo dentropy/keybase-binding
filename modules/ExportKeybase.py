@@ -510,29 +510,67 @@ class ExportKeybase():
         '''
         res = self.cur.execute(sql_query).fetchmany(size=10000)
 
+
+    def get_attachments_from_specific_team_chat(self, team_name, topic_name):
+        sql_query = f'''
+            SELECT  
+                json_extract(message_json, '$.msg.id'), 
+                json_extract(message_json, '$.msg.sender.uid'), 
+                json_extract(message_json, '$.msg.sent_at_ms'), 
+                json_extract(message_json, '$.msg.content.attachment.object.filename')
+            FROM team_messages_t
+            WHERE 
+                json_extract(message_json, '$.msg.content.type') IN ("attachment", "attachmentuploaded")
+                AND team_name =  "{team_name}"
+                AND topic_name = "{topic_name}";
+        '''
+        res = self.cur.execute(sql_query).fetchmany(size=10000)
+        # keybase chat download [command options] <conversation> <attachment id> [-o filename]
+        # Attachment_id is the nonce
+        Path(f"{self.save_dir}Attachments").mkdir(parents=True, exist_ok=True)
+        for file_row in res:
+            list_me = [
+                "keybase", 
+                "chat", 
+                "api", 
+                "-m",
+                '{"method": "download", "params": {"options": {"channel": {"name": "' + f"{team_name}#{topic_name}"+'"}, "message_id": '+str(file_row[0])+', "output": "'+ f"{self.save_dir}Attachments/{file_row[1]}-{file_row[2]}-{file_row[3].replace(' ', '_')}" +'"}}}'
+
+                ]
+            print(" ".join(list_me))
+            # response = subprocess.run(" ".join(list_me), shell=True)
+        return True
+
+
     def get_attachments_from_all_team_chats(self):
         sql_query = f'''
             SELECT  
-                DISTINCT team_name team_messages_t
+                DISTINCT team_name,topic_name team_messages_t
             FROM team_messages_t
         '''
-        tmp_teams = self.cur.execute(sql_query).fetchmany(size=10000)
-        for team_name in tmp_teams:
-            sql_query = f'''
-                SELECT DISTINCT topic_name FROM team_messages_t
-                WHERE team_name = '{team_name[0]}'
-            '''
-            tmp_topics = self.cur.execute(sql_query).fetchmany(size=10000)
-            pprint(f"{team_name[0]} {tmp_topics}")
-        pprint(res)
-        sql_query = f'''
-            SELECT  
-                DISTINCT json_extract(message_json, '$.msg.channel.topic_name')
-            FROM team_messages_t
-            WHERE json_extract(message_json, '$.msg.channel.name') = '{res[0][0]}'
-        '''
-        res = self.cur.execute(sql_query).fetchmany(size=10000)
-        return res
+        team_topic_combos = self.cur.execute(sql_query).fetchmany(size=10000)
+        for team_topic_combo in team_topic_combos:
+            self.get_attachments_from_specific_team_chat(team_topic_combo[0], team_topic_combo[1])
+        # for team_name in tmp_teams:
+        #     sql_query = f'''
+        #         SELECT DISTINCT topic_name FROM team_messages_t
+        #         WHERE team_name = '{team_name[0]}'
+        #     '''
+        #     tmp_topics = self.cur.execute(sql_query).fetchmany(size=10000)
+        #     pprint(f"{team_name[0]} {tmp_topics}")
+        # pprint(res)
+        # sql_query = f'''
+        #     SELECT  
+        #         DISTINCT json_extract(message_json, '$.msg.channel.topic_name')
+        #     FROM team_messages_t
+        #     WHERE json_extract(message_json, '$.msg.channel.name') = '{res[0][0]}'
+        # '''
+        # res = self.cur.execute(sql_query).fetchmany(size=10000)
+        # return res
+
+
+
+
     # def get_user_metadata(self, username):
     #     """Get string of URLs for accounts that user has linked with Keybase account."""
     #     user_metadata = {"verification":[]}
