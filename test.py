@@ -7,7 +7,10 @@ ex_key = ExportKeybase()
 # print(f"{ex_key.get_attachments_from_all_group_chats()}")
 
 
-group_chat_test = 'dentropy,eatergiant'
-result = ex_key.get_attachments_from_specific_group_chat(group_chat_test)
+# group_chat_test = 'dentropy,eatergiant'
+# result = ex_key.get_attachments_from_specific_group_chat(group_chat_test)
+# pprint(result)
+
+
+result = ex_key.get_attachments_from_all_team_chats()
 pprint(result)
-# ex_key.get_attachments_from_group_chats()
