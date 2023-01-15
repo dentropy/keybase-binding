@@ -540,7 +540,7 @@ class ExportKeybase():
         '''
         git_repos = self.cur.execute(sql_query).fetchmany(size=10000)
         for repo in git_repos:
-            save_path = f"{self.save_dir}{repo[0].replace('/', '-')}"
+            save_path = f"{self.save_dir}GitRepos/{repo[0].replace('/', '-')}"
             Path(save_path).mkdir(parents=True, exist_ok=True)
             subprocess.run(f"git clone {repo[1]} {save_path}", shell=True)
         return True
