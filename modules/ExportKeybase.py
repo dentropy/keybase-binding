@@ -50,8 +50,10 @@ class ExportKeybase():
         self.cur.execute("CREATE TABLE IF NOT EXISTS group_messages_t(group_name, message_json)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS team_messages_t(team_name, topic_name, message_json)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS git_repos_t(git_repo_name, git_repo_path)")
-        self.cur.execute("CREATE TABLE IF NOT EXISTS followers_t(keybase_usernames)")
-        self.cur.execute("CREATE TABLE IF NOT EXISTS following_t(keybase_usernames)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS followers_t(keybase_username)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS following_t(keybase_username)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS user_metadata_t(keybase_username, metadata)")
+        self.con.commit()
 
 
     def get_keybase_username(self):
@@ -553,7 +555,7 @@ class ExportKeybase():
         formatted_team_member_list = []
         for item in str(response)[2:-5].split("\\n"):
             formatted_team_member_list.append((item,))
-        self.cur.executemany("INSERT INTO followers_t(keybase_usernames) VALUES(?)", formatted_team_member_list)
+        self.cur.executemany("INSERT INTO followers_t(keybase_username) VALUES(?)", formatted_team_member_list)
         self.con.commit()
         return True
 
@@ -565,11 +567,67 @@ class ExportKeybase():
         formatted_team_member_list = []
         for item in str(response)[2:-5].split("\\n"):
             formatted_team_member_list.append((item,))
-        self.cur.executemany("INSERT INTO following_t(keybase_usernames) VALUES(?)", formatted_team_member_list)
+        self.cur.executemany("INSERT INTO following_t(keybase_username) VALUES(?)", formatted_team_member_list)
         self.con.commit()
         return True
 
+    def get_list_all_users(self):
+        # followers
+        list_all_users = []
+        sql_query = f'''
+            SELECT  
+                DISTINCT keybase_username
+            FROM followers_t
+        '''
+        users = self.cur.execute(sql_query).fetchmany(size=10000)
+        for item in users:
+            if item not in list_all_users:
+                list_all_users.append(item[0])
+        # following
+        sql_query = f'''
+            SELECT  
+                DISTINCT keybase_username
+            FROM following_t
+        '''
+        users = self.cur.execute(sql_query).fetchmany(size=10000)
+        for item in users:
+            if item not in list_all_users:
+                list_all_users.append(item[0])
+        # Individual Messages
+        sql_query = f'''
+            SELECT  
+                DISTINCT json_extract(message_json, '$.msg.sender.username')
+            FROM group_messages_t
+        '''
+        users = self.cur.execute(sql_query).fetchmany(size=10000)
+        for item in users:
+            if item not in list_all_users:
+                list_all_users.append(item[0])
+        # Team Messages
+        sql_query = f'''
+            SELECT  
+                DISTINCT json_extract(message_json, '$.msg.sender.username')
+            FROM team_messages_t
+        '''
+        users = self.cur.execute(sql_query).fetchmany(size=10000)
+        for item in users:
+            if item not in list_all_users:
+                list_all_users.append(item[0])
+        return list_all_users
 
+    def get_all_user_metadata(self):
+        list_all_users = self.get_list_all_users()
+        for keybase_username in list_all_users:
+            res = self.cur.execute(f"SELECT COUNT(*) FROM user_metadata WHERE keybase_username='{keybase_username}'").fetchone()[0]
+            if res != 0:
+                print(f"{keybase_username} metadata already archived")
+            else:
+                print(f"Fetching metadata for {keybase_username}")
+                result = str(subprocess.check_output(["keybase", "id", keybase_username], shell=True))
+                result = result.replace("'", '"')
+                res = self.cur.execute(f"INSERT INTO user_metadata_t(keybase_username,metadata) VALUES('{keybase_username}', '{result}')" )
+                self.con.commit()
+        return True
 
 ##################################################################################3
 

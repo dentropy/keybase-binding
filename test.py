@@ -15,5 +15,5 @@ ex_key = ExportKeybase()
 # result = ex_key.get_attachments_from_all_group_chats()
 # pprint(result)
 
-# ex_key.list_all_git_repos()
-# ex_key.clone_all_git_repos()
+# ex_key.get_list_all_users()
+ex_key.get_all_user_metadata()
