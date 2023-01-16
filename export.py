@@ -17,3 +17,4 @@ print(f"clone_all_git_repos:           {ex_key.clone_all_git_repos()}")
 
 # ex_key.save_specific_team_chat()
 # ex_key.save_specific_team_chat("dentropydaemon")
+# print(f"get_team_channels:        {ex_key.get_team_channels('mkbot')}")

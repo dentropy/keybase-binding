@@ -41,7 +41,7 @@ class ExportKeybase():
         self.whoami = None
         self.teams = None
         self.team_members = None
-        self.teach_channels = None
+        self.team_channels = None
         self.group_chats = None
 
 
@@ -156,7 +156,8 @@ class ExportKeybase():
         mah_json = json.loads(dentropydaemon_channels)
         mah_channels = []
         for i in mah_json["result"]["conversations"]:
-            mah_channels.append(i["channel"]["topic_name"])
+            if "topic_name" in i["channel"]:
+                mah_channels.append(i["channel"]["topic_name"])
         return mah_channels
 
     def get_all_team_channels(self):
@@ -403,7 +404,7 @@ class ExportKeybase():
 
     def save_all_group_chat_channels(self):
         if self.group_chats == None:
-            return self.save_list_group_chats()
+            self.save_list_group_chats()
         channel_list = []
         for channel in self.group_chats:
             if channel["channel"]["members_type"] == "impteamnative":
@@ -425,6 +426,7 @@ class ExportKeybase():
         return True
 
     def save_all_team_channel_messages(self):
+        self.get_all_team_channels()
         channel_list = []
         for team_name in self.team_channels:
             for topic_name in self.team_channels[team_name]:
