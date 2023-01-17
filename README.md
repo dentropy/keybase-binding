@@ -1,5 +1,7 @@
 # keybase-binding
 
+Export your group chats, team chats, group chat attachments, as wells as everyone you ever messaged profile info from keybase into an easy to query system.
+
 ## Install
 
 ``` bash
