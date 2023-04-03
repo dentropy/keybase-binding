@@ -121,6 +121,15 @@ class ExportKeybase():
                 self.team_members[team] = self.get_members_of_team(team)
             return self.team_members
                 
+    def save_team_members(self, team_name):
+        team_members = self.get_members_of_team(team_name)
+        formatted_team_member_list = []
+        for team_member in team_members:
+            formatted_team_member_list.append((team_name,team_member,))
+        self.cur.executemany("INSERT INTO team_members_t(team_name, member_name) VALUES(?, ?)", formatted_team_member_list)
+        self.con.commit()
+        return True
+
 
     def save_members_of_all_teams(self):
         res = self.cur.execute("SELECT COUNT(*) FROM team_members_t").fetchone()[0]
@@ -159,6 +168,16 @@ class ExportKeybase():
             if "topic_name" in i["channel"]:
                 mah_channels.append(i["channel"]["topic_name"])
         return mah_channels
+
+    def save_team_channels(self, team_name):
+        team_channels = self.get_team_channels(team_name)
+        formatted_team_member_list = []
+        for channel in team_channels:
+            for team_member in team_channels:
+               formatted_team_member_list.append((channel,team_member,))
+        self.cur.executemany("INSERT INTO team_channels_t(team_name, channel_name) VALUES(?, ?)", formatted_team_member_list)
+        self.con.commit()
+        return True
 
     def get_all_team_channels(self):
         if self.teams == None:
