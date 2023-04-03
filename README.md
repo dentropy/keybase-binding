@@ -36,3 +36,29 @@ Open up export.py and comment out what you do not want to index
 	* Export all file folder into a directory's, zip directory's, delete all files
 * Design decisions
 	* Store messages and metadata in sqlite, easier to manage and query than a bunch of JSON files in folders
+
+## Converting to CSV or JSON
+
+``` bash
+
+# CSV
+sqlite3 -header -csv ./out/keybase_export.sqlite \
+		"SELECT * FROM team_messages_t;" > ./out/team_messages_t.csv
+
+sqlite3 -header -csv ./out/keybase_export.sqlite \
+		"SELECT * FROM team_channels_t;" > ./out/team_channels_t.csv
+
+sqlite3 -header -csv ./out/keybase_export.sqlite \
+		"SELECT * FROM team_members_t;" > ./out/team_members_t.csv
+
+# JSON
+sqlite3 -header -json ./out/keybase_export.sqlite \
+		"SELECT * FROM team_messages_t;" > ./out/team_messages_t.json
+
+sqlite3 -header -json ./out/keybase_export.sqlite \
+		"SELECT * FROM team_channels_t;" > ./out/team_channels_t.json
+
+sqlite3 -header -json ./out/keybase_export.sqlite \
+		"SELECT * FROM team_members_t;" > ./out/team_members_t.json
+
+```
