@@ -457,7 +457,10 @@ class ExportKeybase():
             tmp_team_name  = channel["team_name"]
             tmp_topic_name = channel["topic_name"]
             print(f"Getting messages from team {tmp_team_name} channel {tmp_topic_name}")
-            fetch_files = self.save_all_messages_from_team_channel(tmp_team_name, tmp_topic_name , f"Teams/{tmp_team_name}/{tmp_topic_name}")
+            try:
+                fetch_files = self.save_all_messages_from_team_channel(tmp_team_name, tmp_topic_name , f"Teams/{tmp_team_name}/{tmp_topic_name}")
+            except Exception as e:
+                print(f"ERROR etting messages from team {tmp_team_name} channel {tmp_topic_name} \n{e}")
             print(fetch_files)
         return True
 
