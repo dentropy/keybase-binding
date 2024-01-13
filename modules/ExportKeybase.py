@@ -627,13 +627,17 @@ class ExportKeybase():
     def get_all_user_metadata(self):
         list_all_users = self.get_list_all_users()
         for keybase_username in list_all_users:
-            res = self.cur.execute(f"SELECT COUNT(*) FROM user_metadata WHERE keybase_username='{keybase_username}'").fetchone()[0]
+            res = self.cur.execute(f"SELECT COUNT(*) FROM user_metadata_t WHERE keybase_username='{keybase_username}'").fetchone()[0]
             if res != 0:
                 print(f"{keybase_username} metadata already archived")
             else:
                 print(f"Fetching metadata for {keybase_username}")
-                result = str(subprocess.check_output(["keybase", "id", keybase_username], shell=True))
-                result = result.replace("'", '"')
-                res = self.cur.execute(f"INSERT INTO user_metadata_t(keybase_username,metadata) VALUES('{keybase_username}', '{result}')" )
-                self.con.commit()
+                try:
+                    result = str(subprocess.check_output(["keybase", "id", keybase_username], shell=True))
+                    result = result.replace("'", '"')
+                    res = self.cur.execute(f"INSERT INTO user_metadata_t(keybase_username,metadata) VALUES('{keybase_username}', '{result}')" )
+                    self.con.commit()
+                except Exception as e:
+                    print(f"Error with get_all_user_metadata {keybase_username}")
+
         return True

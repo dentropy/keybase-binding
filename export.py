@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from modules.ExportKeybase import ExportKeybase
 
 ex_key = ExportKeybase()

@@ -1,5 +1,6 @@
 __pycache__
 out
+out*
 out-bak
 *csv
 *json
